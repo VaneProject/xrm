@@ -89,7 +89,7 @@ public class ReadXrm<X> {
             XSSFSheet sheet = workbook.getSheetAt(sheetIndex);
             if (sheet == null)
                 throw new XrmSheetException("Do not find sheet index: " + sheetIndex);
-            return createItemList(sheet, column, start, end, first, last, false);
+            return createItemList(sheet, column, start, end+1, first, last+1, false);
         } catch (IOException | InvocationTargetException | InstantiationException | IllegalAccessException |
                  NoSuchMethodException e) {
             throw new RuntimeException(e);
@@ -103,7 +103,7 @@ public class ReadXrm<X> {
             XSSFSheet sheet = workbook.getSheet(sheetName);
             if (sheet == null)
                 throw new XrmSheetException("Do not find sheet: " + sheetName);
-            return createItemList(sheet, column, start, end, first, last, false);
+            return createItemList(sheet, column, start, end+1, first, last+1, false);
         } catch (IOException | InvocationTargetException | InstantiationException | IllegalAccessException |
                  NoSuchMethodException e) {
             throw new RuntimeException(e);
@@ -208,7 +208,7 @@ public class ReadXrm<X> {
         // read data
         for (int i = start; i < end; i++) {
             row = sheet.getRow(i);
-            for (int j = first; j < columnName.length; j++) {
+            for (int j = first; j < first+columnName.length; j++) {
                 Object cellValue = getCellValue(row.getCell(j));
                 if (cellValue == null || cellValue instanceof String str && str.isEmpty())
                     columnValue.remove(columnName[j-first]);

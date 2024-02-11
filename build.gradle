@@ -1,9 +1,13 @@
 plugins {
     id 'java'
+    id 'maven-publish'
+    id 'signing'
 }
 
-group = 'com.vane'
-version = '1.0-SNAPSHOT'
+sourceSets.main.java.srcDir 'src'
+
+group = 'io.github.vaneproject'
+version = '1.0.1'
 
 repositories {
     mavenCentral()
@@ -19,4 +23,77 @@ dependencies {
 
 test {
     useJUnitPlatform()
+}
+
+repositories {
+    mavenCentral()
+    maven { url "https://oss.sonatype.org/content/repositories/snapshots/" }
+}
+
+java {
+    withJavadocJar()
+    withSourcesJar()
+}
+
+jar {
+    duplicatesStrategy(DuplicatesStrategy.EXCLUDE)
+}
+
+publishing {
+    publications {
+        mavenJava(MavenPublication) {
+            groupId = 'io.github.vaneproject'
+            artifactId = 'xrm'
+            version = '1.0.1'
+            from components.java
+
+            pom {
+                name = 'xrm'
+                description = 'Xlsx Relational Mapping (Xlsx to Object)'
+                url = 'https://github.com/VaneProject/xrm'
+                licenses {
+                    license {
+                        name = 'MIT License'
+                        url = 'https://github.com/VaneProject/xrm/blob/master/LICENSE'
+                    }
+                }
+                developers {
+                    developer {
+                        id = 'PersesTitan'
+                        name = 'PersesTitan'
+                        email = 'ToramPersesTitan@gmail.com'
+                        organization = "VaneProject"
+                        organizationUrl = 'https://github.com/VaneProject'
+                    }
+                }
+                scm {
+                    connection = 'scm:git:git:github.com/VaneProject/xrm.git'
+                    developerConnection = 'scm:git:ssh://github.com/VaneProject/xrm.git'
+                    url = 'https://github.com/VaneProject/xrm'
+                }
+            }
+        }
+    }
+
+    repositories {
+        maven {
+            name = "OSSRH"
+            url = "https://s01.oss.sonatype.org/service/local/staging/deploy/maven2/"
+            credentials {
+                username = project.properties["ossrhUsername"]
+                password = project.properties["ossrhPassword"]
+            }
+        }
+    }
+}
+
+signing {
+    sign publishing.publications.mavenJava
+}
+
+
+javadoc {
+    if (JavaVersion.current().isJava9Compatible()) {
+        options.addBooleanOption('html5', true)
+    }
 }
