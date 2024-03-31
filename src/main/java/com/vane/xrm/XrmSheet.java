@@ -6,7 +6,11 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-public @interface Xrm {
+@Target(ElementType.TYPE)
+public @interface XrmSheet {
     String value() default "";
+
+    int header() default 1;
+
+    int data() default 2;
 }
