@@ -7,7 +7,7 @@ plugins {
 sourceSets.main.java.srcDir 'src'
 
 group = 'io.github.vaneproject'
-version = '1.0.2'
+version = '1.1.0'
 
 repositories {
     mavenCentral()
@@ -16,8 +16,10 @@ repositories {
 dependencies {
     implementation 'org.apache.poi:poi:5.2.3'
     implementation 'org.apache.poi:poi-ooxml:5.2.3'
+    implementation 'org.jetbrains:annotations:24.0.0'
 
     testImplementation platform('org.junit:junit-bom:5.9.1')
+    testImplementation 'org.apache.logging.log4j:log4j-to-slf4j:2.8.2'
     testImplementation 'org.junit.jupiter:junit-jupiter'
 }
 
@@ -44,7 +46,7 @@ publishing {
         mavenJava(MavenPublication) {
             groupId = 'io.github.vaneproject'
             artifactId = 'xrm'
-            version = '1.0.2'
+            version = this.version
             from components.java
 
             pom {
