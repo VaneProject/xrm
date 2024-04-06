@@ -19,6 +19,6 @@ public class CsvExample3 {
     private LocalDateTime date;
 
     public void print() {
-        System.out.printf("count: %d, name: %s, gender: %s, date: %s%n", number, name, gender, date.toString());
+        System.out.printf("count: %d, name: %s, gender: %s, date: %s%n", number, name, gender, date);
     }
 }
