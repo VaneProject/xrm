@@ -3,6 +3,7 @@ package com.vane.xrm.controller;
 import com.vane.xrm.Csv;
 import com.vane.xrm.CsvSheet;
 import com.vane.xrm.exception.XrmSheetException;
+import com.vane.xrm.format.XrmFormat;
 import com.vane.xrm.items.XlsxHeader;
 import org.jetbrains.annotations.NotNull;
 
@@ -13,12 +14,11 @@ import java.util.regex.Pattern;
 
 public class CsvController<X> extends AnnotationController<X> {
     protected final Class<X> type;
-    private final CsvSheet csvSheet;
     protected final String csvSeq;
 
     protected CsvController(Class<X> type) {
         this.type = type;
-        this.csvSheet = type.getAnnotation(CsvSheet.class);
+        CsvSheet csvSheet = type.getAnnotation(CsvSheet.class);
         if (csvSheet == null)
             throw new XrmSheetException("Do not find @" + CsvSheet.class.getSimpleName());
         this.csvSeq = Pattern.quote(csvSheet.seq());
@@ -34,7 +34,7 @@ public class CsvController<X> extends AnnotationController<X> {
 
     /**
      * create instance
-     * @param data field name && value
+     * @param data field name &amp;&amp; value
      * @return instance value
      */
     @Override
@@ -45,12 +45,17 @@ public class CsvController<X> extends AnnotationController<X> {
                 Csv csv = field.getAnnotation(Csv.class);
                 if (csv == null)
                     continue;
-                super.addConverter(csv.format());
                 String key = getCsvName(csv, field);
                 // have key value
                 if (data.containsKey(key)) {
                     field.setAccessible(true);
-                    Object value = super.getData(field, (String) data.get(key));
+                    Object value;
+                    Class<? extends XrmFormat<?>>[] formats = csv.format();
+                    if (formats.length > 0) {
+                        super.addConverter(formats);
+                        value = super.getData(formats, field, (String) data.get(key));
+                    } else
+                        value = super.getData(field, (String) data.get(key));
                     setData(x, field, value);
                 }
             }

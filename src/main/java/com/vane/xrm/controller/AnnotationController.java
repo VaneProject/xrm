@@ -10,11 +10,13 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.ParameterizedType;
 import java.lang.reflect.Type;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
 
 abstract class AnnotationController<X> {
-    private final Map<Class<?>, XrmFormat<?>> formats = new HashMap<>();
+    private final Map<Class<? extends XrmFormat<?>>, XrmFormat<?>> formats = new HashMap<>();
     private final Map<Class<?>, Function<String, ?>> converter = new HashMap<>() {{
         put(String.class, v -> v);
         // numbers
@@ -49,20 +51,38 @@ abstract class AnnotationController<X> {
         Class<?> type = field.getType();
         if (converter.containsKey(type))
             return converter.get(type).apply(value);
-        else if (formats.containsKey(type))
-            return formats.get(type).format(value);
         throw new XrmTypeException("Do not convert " + type.getName() + " type");
     }
 
+    /**
+     * custom type convert
+     * @param formats custom type
+     * @param field field
+     * @param value origin value
+     * @return convert value
+     */
+    protected final Object getData(Class<? extends XrmFormat<?>>[] formats, @NotNull Field field, String value) {
+        Class<?> type = field.getType();
+        for (Class<? extends XrmFormat<?>> format : formats) {
+            if (this.formats.containsKey(format))
+                return this.formats.get(format).format(value);
+        }
+        throw new XrmTypeException("Do not convert " + type.getName() + " type");
+    }
+
+    /**
+     * add format class
+     * @param formats format list
+     */
     protected final void addConverter(Class<? extends XrmFormat<?>>[] formats) {
         try {
             for (Class<? extends XrmFormat<?>> format : formats) {
-                Class<?> formatClass = getGenericType(format);
-                if (formatClass == null)
-                    throw new XrmFormatException("Format class type error " + format);
-                if (!this.formats.containsKey(formatClass)) {
+                if (!this.formats.containsKey(format)) {
+                    Class<?> formatClass = this.getGenericType(format);
+                    if (formatClass == null)
+                        throw new XrmFormatException("Format class type error " + format);
                     XrmFormat<?> xrmFormat = format.getDeclaredConstructor().newInstance();
-                    this.formats.put(formatClass, xrmFormat);
+                    this.formats.put(format, xrmFormat);
                 }
             }
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
@@ -70,6 +90,11 @@ abstract class AnnotationController<X> {
         }
     }
 
+    /**
+     * return XrmFormat generic class
+     * @param formatKlass XrmFormat class
+     * @return generic type
+     */
     private Class<?> getGenericType(Class<? extends XrmFormat<?>> formatKlass) {
         if (formatKlass.getGenericSuperclass() instanceof ParameterizedType type) {
             Type[] actualTypeArguments = type.getActualTypeArguments();

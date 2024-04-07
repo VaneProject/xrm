@@ -107,7 +107,7 @@ public class XlsxController<X> extends AnnotationController<X> {
 
     /**
      * create instance
-     * @param data field name && value
+     * @param data field name &amp;&amp; value
      * @return instance value
      */
     @Override
