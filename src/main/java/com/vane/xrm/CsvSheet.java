@@ -8,5 +8,9 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.TYPE)
 public @interface CsvSheet {
-    String seq() default ",";
+    char comment() default '#';
+
+    char seq() default ',';
+
+    char quote() default '"';
 }

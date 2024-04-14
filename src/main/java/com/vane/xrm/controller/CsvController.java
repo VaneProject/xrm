@@ -2,67 +2,53 @@ package com.vane.xrm.controller;
 
 import com.vane.xrm.Csv;
 import com.vane.xrm.CsvSheet;
+import com.vane.xrm.controller.type.WordType;
 import com.vane.xrm.exception.XrmSheetException;
-import com.vane.xrm.format.XrmFormat;
-import com.vane.xrm.items.XlsxHeader;
+import com.vane.xrm.items.XrmHeader;
 import org.jetbrains.annotations.NotNull;
 
 import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.util.Map;
-import java.util.regex.Pattern;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Stack;
 
-public class CsvController<X> extends AnnotationController<X> {
-    protected final Class<X> type;
-    protected final String csvSeq;
+public abstract class CsvController<X> extends AnnotationController<X, Csv> {
+    protected final char comment, seq, quote;
 
     protected CsvController(Class<X> type) {
-        this.type = type;
+        super(type, new WordType<>());
         CsvSheet csvSheet = type.getAnnotation(CsvSheet.class);
         if (csvSheet == null)
             throw new XrmSheetException("Do not find @" + CsvSheet.class.getSimpleName());
-        this.csvSeq = Pattern.quote(csvSheet.seq());
+        this.comment = csvSheet.comment();
+        this.seq = csvSheet.seq();
+        this.quote = csvSheet.quote();
     }
 
-    protected XlsxHeader[] getHeader(String line) {
-        String[] tokens = line.split(csvSeq);
-        XlsxHeader[] headers = new XlsxHeader[tokens.length];
-        for (int i = 0; i < tokens.length; i++)
-            headers[i] = new XlsxHeader(i, tokens[i]);
-        return headers;
-    }
-
-    /**
-     * create instance
-     * @param data field name &amp;&amp; value
-     * @return instance value
-     */
-    @Override
-    protected X createInstance(Map<String, Object> data) {
-        try {
-            X x = type.getDeclaredConstructor().newInstance();
-            for (Field field : type.getDeclaredFields()) {
-                Csv csv = field.getAnnotation(Csv.class);
-                if (csv == null)
-                    continue;
-                String key = getCsvName(csv, field);
-                // have key value
-                if (data.containsKey(key)) {
-                    field.setAccessible(true);
-                    Object value;
-                    Class<? extends XrmFormat<?>>[] formats = csv.format();
-                    if (formats.length > 0) {
-                        super.addConverter(formats);
-                        value = super.getData(formats, field, (String) data.get(key));
-                    } else
-                        value = super.getData(field, (String) data.get(key));
-                    setData(x, field, value);
+    protected XrmHeader[] getHeader(String line) {
+        StringBuilder builder = new StringBuilder();
+        Stack<Character> stack = new Stack<>();
+        List<String> list = new ArrayList<>();
+        for (byte b : line.getBytes()) {
+            switch (b) {
+                case ',' -> {
+                    if (stack.isEmpty()) {
+                        list.add(builder.toString());
+                        builder.setLength(0);
+                    } else builder.append(',');
                 }
+                case '"' -> {
+                    if (stack.isEmpty()) stack.add('"');
+                    else stack.pop();
+                }
+                default -> builder.append((char) b);
             }
-            return x;
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-            throw new RuntimeException(e);
         }
+        list.add(builder.toString());
+        XrmHeader[] header = new XrmHeader[list.size()];
+        for (int i = 0; i < header.length; i++)
+            header[i] = new XrmHeader(i, list.get(i));
+        return header;
     }
 
     /**

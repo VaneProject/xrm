@@ -1,20 +1,18 @@
 package com.vane.xrm.read;
 
 import com.vane.xrm.controller.CsvController;
-import com.vane.xrm.controller.XlsxController;
 import com.vane.xrm.exception.XrmFileException;
-import com.vane.xrm.items.XlsxHeader;
-import org.apache.commons.io.input.ReaderInputStream;
+import com.vane.xrm.exception.XrmSyntaxException;
+import com.vane.xrm.items.XrmHeader;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.*;
-import java.lang.reflect.Field;
 import java.util.*;
 import java.util.regex.Pattern;
 
-public class CsvRead<X> extends CsvController<X> implements XrmRead<X> {
-    private final XlsxHeader[] headers;
-    private final List<String> content = new ArrayList<>();
+public final class CsvRead<X> extends CsvController<X> implements XrmRead<X> {
+    private final XrmHeader[] headers;
+    private final List<Object[]> content = new ArrayList<>();
 
     public CsvRead(Class<X> klass, String fileName) {
         this(klass, new File(fileName));
@@ -22,25 +20,57 @@ public class CsvRead<X> extends CsvController<X> implements XrmRead<X> {
 
     public CsvRead(Class<X> klass, File file) {
         super(klass);
-        try (BufferedReader reader = new BufferedReader(new FileReader(file))) {
-            this.headers = super.getHeader(reader.readLine());
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            StreamTokenizer tokenizer = new StreamTokenizer(new FileReader(file));
+            tokenizer.eolIsSignificant(true);
+            tokenizer.quoteChar(super.quote);
+            tokenizer.commentChar(super.comment);
+            tokenizer.ordinaryChars(super.seq, super.seq);
+
             String line;
-            while ((line = reader.readLine()) != null)
-                content.add(line);
-        } catch (IOException e) {
+            int headerIndex = 0, i = 0;
+            while ((line = br.readLine()) != null) {
+                headerIndex++;
+                line = line.strip();
+                if (!line.isEmpty() && line.charAt(0) == super.comment)
+                    continue;
+                break;
+            }
+            if (line == null)
+                throw new XrmSyntaxException("No header found");
+            this.headers = super.getHeader(line);
+
+            Object[] values = new Object[headers.length];
+            while (tokenizer.nextToken() != StreamTokenizer.TT_EOF) {
+                if (tokenizer.lineno() <= headerIndex)
+                    continue;
+                int ttype = tokenizer.ttype;
+                if (ttype == super.quote || ttype == StreamTokenizer.TT_WORD)
+                    values[i++] = tokenizer.sval;
+                else if (ttype == StreamTokenizer.TT_NUMBER)
+                    values[i++] = tokenizer.nval;
+                else if (ttype == StreamTokenizer.TT_EOL) {
+                    i = 0;
+                    values = new Object[headers.length];
+                    content.add(values);
+                }
+            }
+        } catch (FileNotFoundException e) {
             throw new XrmFileException(e.getMessage());
+        } catch (IOException e) {
+            throw new XrmSyntaxException(e.getMessage());
         }
     }
 
     @Override
-    public X get(int i) {
-        String line = content.get(i);
-        return createData(line);
+    protected XrmHeader[] getHeaders() {
+        return this.headers;
     }
 
-    public X get(int i, String seq) {
-        String line = content.get(i);
-        return createData(line, Pattern.quote(seq));
+    @Override
+    public X get(int i) {
+        Object[] values = content.get(i);
+        return createData(values);
     }
 
     @Override
@@ -50,15 +80,10 @@ public class CsvRead<X> extends CsvController<X> implements XrmRead<X> {
             .toList();
     }
 
-    private X createData(@NotNull String line) {
-        return createData(line, super.csvSeq);
-    }
-
-    private X createData(@NotNull String line, String seq) {
-        String[] tokens = line.split(seq);
-        Map<String, Object> data = new HashMap<>();
-        for (XlsxHeader header : headers)
-            data.put(header.key(), tokens[header.index()]);
-        return super.createInstance(data);
+    private X createData(@NotNull Object[] values) {
+        Map<String, Object> map = new HashMap<>(headers.length);
+        for (XrmHeader header : headers)
+            map.put(header.key(), values[header.index()]);
+        return super.createInstance(map);
     }
 }

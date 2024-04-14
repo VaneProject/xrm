@@ -4,12 +4,10 @@ import com.vane.xrm.Csv;
 import com.vane.xrm.CsvSheet;
 
 @CsvSheet
-public class CsvExample2 {
+class CsvExample2 {
     @Csv("count")
     private int number;
-    @Csv
     private String name;
-    @Csv
     private String gender;
 
     public void print() {

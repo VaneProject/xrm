@@ -7,7 +7,7 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.FIELD)
-public @interface Xrm {
+public @interface Tsv {
     String value() default "";
 
     boolean notUsed() default false;

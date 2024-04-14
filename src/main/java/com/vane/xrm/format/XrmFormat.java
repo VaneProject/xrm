@@ -1,8 +1,5 @@
 package com.vane.xrm.format;
 
 public abstract class XrmFormat<TYPE> {
-    public XrmFormat() {
-    }
-
-    public abstract TYPE format(String s);
+    public abstract TYPE format(Object s);
 }

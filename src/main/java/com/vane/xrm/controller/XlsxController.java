@@ -2,9 +2,10 @@ package com.vane.xrm.controller;
 
 import com.vane.xrm.Xrm;
 import com.vane.xrm.XrmSheet;
+import com.vane.xrm.controller.type.WrapperType;
 import com.vane.xrm.exception.XrmSheetException;
 import com.vane.xrm.exception.XrmTypeException;
-import com.vane.xrm.items.XlsxHeader;
+import com.vane.xrm.items.XrmHeader;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.DateUtil;
 import org.apache.poi.xssf.usermodel.XSSFRow;
@@ -18,20 +19,21 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-public class XlsxController<X> extends AnnotationController<X> {
+public abstract class XlsxController<X> extends AnnotationController<X, Xrm> {
     protected final Class<X> type;
     private final XrmSheet xrmSheet;
 
     protected XlsxController(Class<X> type) {
+        super(type, new WrapperType<>());
         this.type = type;
         this.xrmSheet = type.getAnnotation(XrmSheet.class);
         if (xrmSheet == null)
             throw new XrmSheetException("Do not find @" + XrmSheet.class.getSimpleName());
     }
 
-    protected XlsxHeader[] getHeader(XSSFSheet sheet) {
+    protected XrmHeader[] getHeader(XSSFSheet sheet) {
         int headerIndex = this.getHeaderIndex();
-        List<XlsxHeader> list = new ArrayList<>();
+        List<XrmHeader> list = new ArrayList<>();
         XSSFRow row = sheet.getRow(headerIndex);
         int start = row.getFirstCellNum();
         int end = row.getLastCellNum();
@@ -39,9 +41,9 @@ public class XlsxController<X> extends AnnotationController<X> {
         for (int i = start; i < end; i++) {
             final Cell cell = row.getCell(i);
             if (isHeaderType(cell))
-                list.add(new XlsxHeader(i, getHeaderKey(cell)));
+                list.add(new XrmHeader(i, getHeaderKey(cell)));
         }
-        return list.toArray(XlsxHeader[]::new);
+        return list.toArray(XrmHeader[]::new);
     }
 
     private boolean isHeaderType(Cell cell) {
@@ -103,32 +105,6 @@ public class XlsxController<X> extends AnnotationController<X> {
             case _NONE -> null;
             case ERROR -> throw new XrmTypeException(cell, "Type Error: " + cell.getErrorCellValue());
         };
-    }
-
-    /**
-     * create instance
-     * @param data field name &amp;&amp; value
-     * @return instance value
-     */
-    @Override
-    protected X createInstance(Map<String, Object> data) {
-        try {
-            X x = type.getDeclaredConstructor().newInstance();
-            for (Field field : type.getDeclaredFields()) {
-                Xrm xrm = field.getAnnotation(Xrm.class);
-                if (xrm == null)
-                    continue;
-                String key = getXrmName(xrm, field);
-                // have key value
-                if (data.containsKey(key)) {
-                    field.setAccessible(true);
-                    setData(x, field, data.get(key));
-                }
-            }
-            return x;
-        } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
-            throw new RuntimeException(e);
-        }
     }
 
     /**

@@ -2,7 +2,7 @@ package com.vane.xrm.read;
 
 import com.vane.xrm.controller.XlsxController;
 import com.vane.xrm.exception.XrmFileException;
-import com.vane.xrm.items.XlsxHeader;
+import com.vane.xrm.items.XrmHeader;
 import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.Row;
@@ -19,7 +19,7 @@ import java.util.Map;
 
 public final class XlsxRead<X> extends XlsxController<X> implements XrmRead<X> {
     private final XSSFSheet sheet;
-    private final XlsxHeader[] headers;
+    private final XrmHeader[] headers;
 
     public XlsxRead(Class<X> klass, String fileName) {
         this(klass, new File(fileName));
@@ -33,6 +33,11 @@ public final class XlsxRead<X> extends XlsxController<X> implements XrmRead<X> {
         } catch (IOException | InvalidFormatException e) {
             throw new XrmFileException(e.getMessage());
         }
+    }
+
+    @Override
+    protected XrmHeader[] getHeaders() {
+        return this.headers;
     }
 
     @Override
@@ -57,7 +62,7 @@ public final class XlsxRead<X> extends XlsxController<X> implements XrmRead<X> {
 
     private X createData(@NotNull Row row) {
         Map<String, Object> data = new HashMap<>();
-        for (XlsxHeader header : headers) {
+        for (XrmHeader header : headers) {
             Cell cell = row.getCell(header.index());
             Object value = super.getCellValue(cell);
             data.put(header.key(), value);
@@ -66,7 +71,7 @@ public final class XlsxRead<X> extends XlsxController<X> implements XrmRead<X> {
     }
 
     private boolean haveDataCell(Row row) {
-        for (XlsxHeader header : headers) {
+        for (XrmHeader header : headers) {
             Cell cell = row.getCell(header.index());
             switch (cell.getCellType()) {
                 case BLANK, _NONE: continue;

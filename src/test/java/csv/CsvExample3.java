@@ -8,7 +8,7 @@ import com.vane.xrm.format.LocalDateTimeFormat;
 import java.time.LocalDateTime;
 
 @CsvSheet
-public class CsvExample3 {
+class CsvExample3 {
     @Csv("count")
     private int number;
     @Csv

@@ -4,7 +4,7 @@ import java.time.LocalDate;
 
 public class LocalDateFormat extends XrmFormat<LocalDate> {
     @Override
-    public LocalDate format(String s) {
-        return LocalDate.parse(s);
+    public LocalDate format(Object s) {
+        return LocalDate.parse((String) s);
     }
 }

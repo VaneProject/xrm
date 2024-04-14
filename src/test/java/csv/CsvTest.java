@@ -7,7 +7,7 @@ import java.util.List;
 
 public class CsvTest {
     @Test
-    void csv_print_test1() {
+    public void csv_print_test1() {
         String path = this.getClass().getClassLoader().getResource("example1.csv").getFile();
         CsvRead<CsvExample1> read = new CsvRead<>(CsvExample1.class, path);
 
@@ -22,7 +22,7 @@ public class CsvTest {
     }
 
     @Test
-    void csv_print_test2() {
+    public void csv_print_test2() {
         String path = this.getClass().getClassLoader().getResource("example2.csv").getFile();
         CsvRead<CsvExample2> read = new CsvRead<>(CsvExample2.class, path);
         System.out.println("Print all");
@@ -36,7 +36,7 @@ public class CsvTest {
     }
 
     @Test
-    void csv_print_test3() {
+    public void csv_print_test3() {
         String path = this.getClass().getClassLoader().getResource("example3.csv").getFile();
         CsvRead<CsvExample3> read = new CsvRead<>(CsvExample3.class, path);
         System.out.println("Print all");

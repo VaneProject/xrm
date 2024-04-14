@@ -6,9 +6,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
-@Target(ElementType.FIELD)
-public @interface Xrm {
-    String value() default "";
-
-    boolean notUsed() default false;
+@Target(ElementType.TYPE)
+public @interface TsvSheet {
+    char seq() default '\t';
 }

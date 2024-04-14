@@ -1,57 +1,144 @@
 package com.vane.xrm.controller;
 
+import com.vane.xrm.controller.type.PrimitiveType;
 import com.vane.xrm.exception.XrmFormatException;
+import com.vane.xrm.exception.XrmInstanceException;
 import com.vane.xrm.exception.XrmTypeException;
+import com.vane.xrm.format.VoidFormat;
 import com.vane.xrm.format.XrmFormat;
+import com.vane.xrm.items.XrmHeader;
 import org.jetbrains.annotations.NotNull;
 
-import java.lang.reflect.Field;
-import java.lang.reflect.InvocationTargetException;
-import java.lang.reflect.ParameterizedType;
-import java.lang.reflect.Type;
+import java.lang.annotation.Annotation;
+import java.lang.reflect.*;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
-import java.util.function.Function;
+import java.util.Objects;
 
-abstract class AnnotationController<X> {
+/**
+ * controller center class
+ * @param <X> instance type
+ * @param <A> annotation type
+ */
+abstract class AnnotationController<X, A extends Annotation> {
+    // format class repository
     private final Map<Class<? extends XrmFormat<?>>, XrmFormat<?>> formats = new HashMap<>();
-    private final Map<Class<?>, Function<String, ?>> converter = new HashMap<>() {{
-        put(String.class, v -> v);
-        // numbers
-        put(byte.class, Byte::parseByte);
-        put(Byte.class, Byte::parseByte);
-        put(short.class, Short::parseShort);
-        put(Short.class, Short::parseShort);
-        put(int.class, Integer::parseInt);
-        put(Integer.class, Integer::parseInt);
-        put(long.class, Long::parseLong);
-        put(Long.class, Long::parseLong);
-        put(float.class, Float::parseFloat);
-        put(Float.class, Float::parseFloat);
-        put(double.class, Double::parseDouble);
-        put(Double.class, Double::parseDouble);
-    }};
+    // X type field information
+    private final Map<String, Field> fields = new HashMap<>();
+    // class type, annotation type
+    protected final Class<X> type;
+    protected final Class<A> annotationType;
+    private final PrimitiveType<X> primitiveType;
+
+    @SuppressWarnings("unchecked")
+    AnnotationController(Class<X> type, PrimitiveType<X> primitiveType) {
+        this.primitiveType = primitiveType;
+        this.type = type;
+        this.annotationType = (Class<A>) this.getGeneric(getClass().getSuperclass(), 1);
+        if (annotationType == null)
+            throw new RuntimeException("Development error");
+        // read type all fields
+        for (Field field : type.getDeclaredFields()) {
+            A a = field.getAnnotation(this.annotationType);
+            String name;
+            if (a == null) name = field.getName();
+            else if (isNotUsed(a)) continue;
+            else name = getFieldName(a);
+            // default value
+            if (name.isEmpty())
+                name = field.getName();
+            // check same name
+            if (fields.containsKey(name))
+                throw new XrmInstanceException("Duplicate field name: " + name);
+            fields.put(name, field);
+        }
+    }
+
+    /**
+     * @return get headers
+     */
+    protected abstract XrmHeader[] getHeaders();
+
+    /**
+     * Annotation Function <br>
+     * notUsed method <br>
+     * default value: false
+     * @param a annotation type
+     * @return if is not used return false
+     */
+    private boolean isNotUsed(@NotNull A a) {
+        try {
+            return (boolean) annotationType.getMethod("notUsed").invoke(a);
+        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            return false;
+        }
+    }
+
+    /**
+     * Annotation Function <br>
+     * get default or field name
+     * @param a annotation
+     * @return field names
+     */
+    private @NotNull String getFieldName(@NotNull A a) {
+        try {
+            return (String) annotationType.getMethod("value").invoke(a);
+        } catch (IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
+            throw new RuntimeException("Development error");
+        }
+    }
+
+    /**
+     * find method by name
+     * @return method or null
+     */
+    private Method findMethodFormat() {
+        for (Method method : annotationType.getMethods()) {
+            if (Objects.equals("format", method.getName()))
+                return method;
+        }
+        return null;
+    }
 
     /**
      * createInstance
      * @param data data
      * @return create type
      */
-    protected abstract X createInstance(Map<String, Object> data);
+    @SuppressWarnings("unchecked")
+    protected final X createInstance(final Map<String, Object> data) {
+        try {
+            final X x = type.getDeclaredConstructor().newInstance();
+            final Method formatMethod = findMethodFormat();
+            for (XrmHeader header : getHeaders()) {
+                final String key = header.key();
+                final Field field = fields.get(key);
+                if (field == null || !data.containsKey(key))
+                    continue;
 
-    /**
-     * type convert
-     * @param field field
-     * @param value origin value
-     * @return convert value
-     */
-    protected final Object getData(@NotNull Field field, String value) {
-        Class<?> type = field.getType();
-        if (converter.containsKey(type))
-            return converter.get(type).apply(value);
-        throw new XrmTypeException("Do not convert " + type.getName() + " type");
+                Object value = data.get(key);
+                A a = field.getAnnotation(annotationType);
+                field.setAccessible(true);
+                if (a != null && formatMethod != null) {
+                    Class<? extends XrmFormat<?>> formatKlass = (Class<? extends XrmFormat<?>>) formatMethod.invoke(a);
+                    if (VoidFormat.class != formatKlass) {
+                        XrmFormat<?> format = this.addConverter(formatKlass);
+                        this.primitiveType.setTypes(x, field, format.format(value));
+                        continue;
+                    }
+                }
+                this.primitiveType.setTypes(x, field, value);
+            }
+            return x;
+        } catch (InstantiationException e) {
+            throw new XrmInstanceException("Instance failed. " + e.getMessage());
+        } catch (IllegalAccessException e) {
+            throw new XrmInstanceException("Cannot access the corresponding creator.");
+        } catch (NoSuchMethodException e) {
+            throw new XrmInstanceException("Default constructor does not exist.");
+        } catch (InvocationTargetException e) {
+            throw new XrmInstanceException("An exception occurred in the called constructor.");
+        }
     }
 
     /**
@@ -72,19 +159,19 @@ abstract class AnnotationController<X> {
 
     /**
      * add format class
-     * @param formats format list
+     * @param format format list
      */
-    protected final void addConverter(Class<? extends XrmFormat<?>>[] formats) {
+    private XrmFormat<?> addConverter(Class<? extends XrmFormat<?>> format) {
         try {
-            for (Class<? extends XrmFormat<?>> format : formats) {
-                if (!this.formats.containsKey(format)) {
-                    Class<?> formatClass = this.getGenericType(format);
-                    if (formatClass == null)
-                        throw new XrmFormatException("Format class type error " + format);
-                    XrmFormat<?> xrmFormat = format.getDeclaredConstructor().newInstance();
-                    this.formats.put(format, xrmFormat);
-                }
+            if (! this.formats.containsKey(format)) {
+                Class<?> formatClass = getGeneric(format, 0);
+                if (formatClass == null)
+                    throw new XrmFormatException("Format class type error " + format);
+                XrmFormat<?> xrmFormat = format.getDeclaredConstructor().newInstance();
+                this.formats.put(format, xrmFormat);
+                return xrmFormat;
             }
+            return this.formats.get(format);
         } catch (InstantiationException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
             throw new RuntimeException(e);
         }
@@ -92,41 +179,16 @@ abstract class AnnotationController<X> {
 
     /**
      * return XrmFormat generic class
-     * @param formatKlass XrmFormat class
-     * @return generic type
+     * @param type XrmFormat class
+     * @param i index value
+     * @return generic type or null
      */
-    private Class<?> getGenericType(Class<? extends XrmFormat<?>> formatKlass) {
-        if (formatKlass.getGenericSuperclass() instanceof ParameterizedType type) {
-            Type[] actualTypeArguments = type.getActualTypeArguments();
-            if (actualTypeArguments.length > 0 && actualTypeArguments[0] instanceof Class<?> klass)
-                return klass;
+    private Class<?> getGeneric(Class<?> type, int i) {
+        if (type.getGenericSuperclass() instanceof ParameterizedType parameterizedType) {
+            Type[] actualTypeArguments = parameterizedType.getActualTypeArguments();
+            if (actualTypeArguments.length > i && actualTypeArguments[i] instanceof Class<?> clazz)
+                return clazz;
         }
         return null;
-    }
-
-    /**
-     * set data
-     * @param x object instance
-     * @param field filed type
-     * @param value field value
-     */
-    protected final void setData(X x, @NotNull Field field, Object value) throws IllegalAccessException {
-        Class<?> type = field.getType();
-        if (value instanceof Double number) {
-            if (type == byte.class) field.setByte(x, number.byteValue());
-            else if (type == short.class) field.setShort(x, number.shortValue());
-            else if (type == int.class) field.setInt(x, number.intValue());
-            else if (type == long.class) field.setLong(x, number.longValue());
-            else if (type == float.class) field.setFloat(x, number.floatValue());
-            else if (type == double.class) field.setDouble(x, number);
-            // wrapper type
-            else if (type == Byte.class) field.set(x, number.byteValue());
-            else if (type == Short.class) field.set(x, number.shortValue());
-            else if (type == Integer.class) field.set(x, number.intValue());
-            else if (type == Long.class) field.set(x, number.longValue());
-            else if (type == Float.class) field.set(x, number.floatValue());
-            else if (type == Double.class) field.set(x, number);
-            else throw new XrmTypeException(type, value);
-        } else field.set(x, value);
     }
 }
